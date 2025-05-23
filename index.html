@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <title>BPM Tracker</title>
+  <style>
+    body {
+      margin: 0;
+      background-color: white;
+      font-family: sans-serif;
+      user-select: none;
+      height: 100vh;
+      overflow: hidden;
+    }
+    .top-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 12px;
+      background-color: #f0f0f0;
+    }
+    .menu {
+      cursor: pointer;
+      font-weight: bold;
+    }
+    .add {
+      cursor: pointer;
+      font-size: 24px;
+      font-weight: bold;
+    }
+    .history {
+      position: absolute;
+      top: 40px;
+      left: 10px;
+      background: white;
+      border: 1px solid #ccc;
+      max-height: 200px;
+      overflow-y: auto;
+      font-size: 14px;
+      display: none;
+      padding: 5px;
+      width: 250px;
+      z-index: 10;
+    }
+    .main {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      height: calc(100vh - 50px);
+    }
+    input {
+      font-size: 18px;
+      padding: 5px;
+      margin-bottom: 20px;
+      width: 300px;
+    }
+    h1 {
+      font-size: 48px;
+      margin: 0;
+    }
+    p {
+      font-size: 16px;
+      color: gray;
+      margin: 10px 0 0 0;
+    }
+  </style>
+</head>
+<body>
+  <div class="top-bar">
+    <div class="menu" onclick="toggleHistory()" id="menuBtn">☰ 历史</div>
+    <div class="add" onclick="saveBPM()">＋</div>
+  </div>
+  <div class="history" id="historyBox"></div>
+
+  <div class="main">
+    <input id="bpmName" placeholder="请输入本次 BPM 名称..." />
+    <h1 id="bpmText">BPM：---</h1>
+    <p id="diffText">±0ms</p>
+  </div>
+
+  <script>
+    const bpmText = document.getElementById("bpmText");
+    const diffText = document.getElementById("diffText");
+    const bpmName = document.getElementById("bpmName");
+    const historyBox = document.getElementById("historyBox");
+    const timestamps = [];
+    const intervals = [];
+    let lastAvgInterval = null;
+
+    function isClickInsideUI(event) {
+      return bpmName.contains(event.target) || historyBox.contains(event.target) || event.target.id === 'menuBtn';
+    }
+
+    function updateBPM(event) {
+      if (isClickInsideUI(event)) return; // 忽略 UI 控件点击
+
+      const now = Date.now();
+      if (timestamps.length > 0) {
+        const interval = now - timestamps[timestamps.length - 1];
+        intervals.push(interval);
+        if (intervals.length > 20) intervals.shift(); // 限制最大长度
+      }
+      timestamps.push(now);
+      if (timestamps.length > 30) timestamps.shift();
+
+      if (intervals.length > 0) {
+        const avgInterval = intervals.reduce((a, b) => a + b, 0) / intervals.length;
+        const bpm = 60000 / avgInterval;
+        bpmText.textContent = `BPM：${bpm.toFixed(2)}`;
+
+        if (lastAvgInterval !== null) {
+          const diff = avgInterval - lastAvgInterval;
+          const sign = diff >= 0 ? "+" : "-";
+          diffText.textContent = `${sign}${Math.abs(diff).toFixed(0)}ms`;
+        } else {
+          diffText.textContent = "±0ms";
+        }
+        lastAvgInterval = avgInterval;
+      } else {
+        bpmText.textContent = "BPM：---";
+        diffText.textContent = "±0ms";
+      }
+    }
+
+    function saveBPM() {
+      const name = bpmName.value.trim() || "未命名";
+      const bpmValue = bpmText.textContent.replace("BPM：", "").trim();
+      if (bpmValue === "---") {
+        alert("尚未有有效 BPM 数据");
+        return;
+      }
+
+      const record = {
+        name: name,
+        bpm: bpmValue,
+        time: new Date().toLocaleString()
+      };
+
+      let history = JSON.parse(localStorage.getItem("bpmHistory") || "[]");
+      history.unshift(record);
+      localStorage.setItem("bpmHistory", JSON.stringify(history));
+      alert("已保存！");
+      renderHistory();
+    }
+
+    function toggleHistory() {
+      const visible = historyBox.style.display === "block";
+      historyBox.style.display = visible ? "none" : "block";
+      if (!visible) renderHistory();
+    }
+
+    function renderHistory() {
+      const history = JSON.parse(localStorage.getItem("bpmHistory") || "[]");
+      historyBox.innerHTML = history.map(r =>
+        `<div>【${r.name}】${r.bpm} BPM<br><small>${r.time}</small></div><hr>`
+      ).join('') || "<em>无记录</em>";
+    }
+
+    document.addEventListener("click", updateBPM);
+    document.addEventListener("keydown", updateBPM);
+  </script>
+</body>
+</html>
