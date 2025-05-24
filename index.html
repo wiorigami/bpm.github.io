@@ -95,11 +95,17 @@
   <script>
     let timestamps = [];
     let lastBPM = null;
-    const songLibrary = [
-      { name: "Introduction (Old)", bpm: 135 },
-      { name: "Glaciaxion", bpm: 140 },
-      { name: "Rise", bpm: 138 },
-    ];
+    let songLibrary = [];
+
+    fetch('assets/bpm_phigros/bpm_phigros.txt')
+      .then(res => res.text())
+      .then(text => {
+        try {
+          songLibrary = JSON.parse(text);
+        } catch (e) {
+          console.error("曲库加载失败：", e);
+        }
+      });
 
     function handleTap(event) {
       if (event.target !== document.getElementById('overlay')) return;
@@ -142,6 +148,7 @@
     }
 
     function showRecommendations(currentBPM) {
+      if (!songLibrary || songLibrary.length === 0) return;
       const currentMs = 60000 / currentBPM;
       const matches = songLibrary.filter(song => {
         const songMs = 60000 / song.bpm;
