@@ -1,0 +1,33 @@
+name: Fetch Phigros BPM
+
+on:
+  schedule:
+    - cron: '0 0 * * *'  # 每天 UTC 时间 0 点运行
+  workflow_dispatch:  # 允许手动触发
+
+jobs:
+  update-bpm:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 检出仓库
+        uses: actions/checkout@v3
+
+      - name: 设置 Python 环境
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.x'
+
+      - name: 安装依赖
+        run: pip install requests beautifulsoup4
+
+      - name: 运行爬虫脚本
+        run: python scripts/fetch_phigros_bpm.py
+
+      - name: 提交更改
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add assets/bpm_phigros/phigros_bpm.json
+          git commit -m "自动更新 Phigros BPM 数据" || echo "无更改"
+          git push
