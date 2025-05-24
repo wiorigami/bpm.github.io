@@ -1,384 +1,157 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>BPM 检测器</title>
   <style>
-    body {
-      background-color: white;
-      font-family: Arial, sans-serif;
+    body, html {
       margin: 0;
       padding: 0;
-      overflow: hidden;
+      font-family: sans-serif;
+      background: #fff;
+      color: #333;
+      height: 100%;
     }
-    .top-bar {
+    #app {
+      height: 100vh;
       display: flex;
-      justify-content: space-between;
+      flex-direction: column;
       align-items: center;
-      background-color: #f0f0f0;
-      padding: 10px 20px;
-    }
-    .menu {
-      font-size: 16px;
-      cursor: pointer;
-    }
-    .add {
-      font-size: 24px;
-      cursor: pointer;
-    }
-    .container {
+      justify-content: center;
+      position: relative;
       text-align: center;
-      margin-top: 100px;
     }
-    input {
-      font-size: 18px;
-      padding: 5px;
-      margin-bottom: 10px;
-      width: 300px;
+    #overlay {
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      z-index: 0;
     }
-    .bpm {
-      font-size: 48px;
+    .input-area, .display-area {
+      position: relative;
+      z-index: 1;
+      background: white;
+      padding: 10px;
+      border-radius: 8px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+      margin: 10px;
+    }
+    input[type="text"] {
+      padding: 8px;
+      font-size: 16px;
+      width: 200px;
+    }
+    .bpm-display {
+      font-size: 36px;
       margin: 10px 0;
     }
-    .delta {
-      font-size: 16px;
-      color: gray;
+    .diff-display {
+      font-size: 14px;
+      color: #888;
     }
-    #matchModal {
+    .top-bar {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      right: 10px;
+      display: flex;
+      justify-content: space-between;
+      z-index: 1;
+    }
+    button {
+      padding: 6px 10px;
+      margin: 0 4px;
+      cursor: pointer;
+    }
+    #history {
       position: fixed;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      background: #fff;
-      padding: 20px;
-      box-shadow: 0 0 10px gray;
+      top: 60px;
+      left: 10px;
+      background: white;
+      border: 1px solid #ccc;
+      padding: 10px;
       display: none;
+      max-height: 80vh;
+      overflow: auto;
     }
   </style>
 </head>
 <body>
+  <div class="top-bar">
+    <button onclick="toggleHistory()">📂 历史</button>
+    <button onclick="saveBPM()">➕ 保存</button>
+  </div>
+  <div id="history"></div>
+  <div id="app">
+    <div id="overlay" onclick="handleTap(event)"></div>
+    <div class="input-area">
+      <input type="text" id="bpmName" placeholder="BPM 名称" />
+    </div>
+    <div class="display-area">
+      <div class="bpm-display" id="bpmValue">BPM：--</div>
+      <div class="diff-display" id="bpmDiff">--</div>
+    </div>
+  </div>
+  <script>
+    let timestamps = [];
+    let lastBPM = null;
+    const songLibrary = [
+      { name: "Introduction (Old)", bpm: 135 },
+      { name: "Glaciaxion", bpm: 140 },
+      { name: "Rise", bpm: 138 },
+    ];
 
-<div class="top-bar">
-  <div class="menu" onclick="showHistory()">☰ 菜单</div>
-  <div class="add" onclick="saveBPM()">＋</div>
-</div>
-
-<div class="container">
-  <input type="text" id="bpmName" placeholder="请输入本次 BPM 名称">
-  <div class="bpm" id="bpmDisplay">BPM：---</div>
-  <div class="delta" id="deltaDisplay"></div>
-</div>
-
-<div id="matchModal"></div>
-
-<script>
-  let startTime = null;
-  let lastBPM = null;
-  let bpmHistory = [];
-
-  const bpmList = [
-  { name: "Introduction (Old)", bpm: 135 },
-  { name: "Introduction (New)", bpm: 138 },
-  { name: "Glaciaxion", bpm: 140 },
-  { name: "Eradication Catastrophe", bpm: 120 },
-  { name: "Credits", bpm: 179 },
-  { name: "Dlyrotz", bpm: 175 },
-  { name: "Engine x Start!! (melody mix)", bpm: 186 },
-  { name: "光", bpm: 180 },
-  { name: "Winter ↑cube↓", bpm: 104 },
-  { name: "Cipher : /2&//<|0", bpm: 179 },
-  { name: "混乱-Confusion", bpm: 180 },
-  { name: "FULi AUTO SHOOTER", bpm: 145 },
-  { name: "HumaN", bpm: 180 },
-  { name: "[PRAW]", bpm: 210 },
-  { name: "Pixel Rebelz", bpm: 150 },
-  { name: "Cereris", bpm: 175 },
-  { name: "Non-Melodic Ragez (MUG Edit)", bpm: 205 },
-  { name: "Doppelganger", bpm: 280 },
-  { name: "もぺもぺ", bpm: 200 },
-  { name: "MARENOL", bpm: 140 },
-  { name: "萤火虫の怨", bpm: 100 },
-  { name: "万吨匿名信", bpm: 120 },
-  { name: "风屿", bpm: 170 },
-  { name: "dB doll", bpm: 128 },
-  { name: "Dash", bpm: 128 },
-  { name: "云女孩", bpm: 155 },
-  { name: "Drop It", bpm: 126 },
-  { name: "RIPPER", bpm: 150 },
-  { name: "Sultan Rage", bpm: 155 },
-  { name: "Class Memories", bpm: 145 },
-  { name: "-SURREALISM-", bpm: 180 },
-  { name: "Bonus Time", bpm: 180 },
-  { name: "ENERGY SYNERGY MATRIX", bpm: 160 },
-  { name: "Aphasia", bpm: 128 },
-  { name: "开心病", bpm: 131 },
-  { name: "華灯爱", bpm: 120 },
-  { name: "Find_Me", bpm: 191 },
-  { name: "狂喜蘭舞", bpm: 230 },
-  { name: "Sparkle New Life", bpm: 150 },
-  { name: "Khronostasis Katharsis", bpm: 188 },
-  { name: "Snow Desert", bpm: 125 },
-  { name: "Burn", bpm: 148 },
-  { name: "Christmas", bpm: 125 },
-  { name: "NYA!!!", bpm: 150 },
-  { name: "JunXion Between Life And Death(VIP Mix)", bpm: 164 },
-  { name: "cryout", bpm: 180 },
-  { name: "Reimei", bpm: 185 },
-  { name: "尊師 ～The Guru～", bpm: 160 },
-  { name: "Spasmodic", bpm: 200 },
-  { name: "Next Time", bpm: 175 },
-  { name: "Rubbish Sorting", bpm: 128 },
-  { name: "Another Me (Rising Sun Traxxx)", bpm: 175 },
-  { name: "mechanted", bpm: 172 },
-  { name: "life flashes before weeb eyes", bpm: 217 },
-  { name: "Break Through The Barrier", bpm: 176 },
-  { name: "Chronostasis", bpm: 196 },
-  { name: "Dead Soul", bpm: 132 },
-  { name: "Infinity Heaven", bpm: 160 },
-  { name: "Disorder", bpm: 193 },
-  { name: "CROSS†SOUL", bpm: 200 },
-  { name: "Speed Up!", bpm: 145 },
-  { name: "Magenta Potion", bpm: 150 },
-  { name: "Get Back", bpm: 128 },
-  { name: "Palescreen", bpm: 173 },
-  { name: "Leave All Behind", bpm: 150 },
-  { name: "GOODTEK", bpm: 190 },
-  { name: "GOODBOUNCE", bpm: 180 },
-  { name: "GOODWORLD", bpm: 165 },
-  { name: "GOODFORTUNE", bpm: 170 },
-  { name: "GOODRAGE", bpm: 222 },
-  { name: "Colorful Days♪", bpm: 136 },
-  { name: "micro.wav", bpm: 172 },
-  { name: "重生", bpm: 195 },
-  { name: "NO ONE YES MAN", bpm: 170 },
-  { name: "望影の方舟Six", bpm: 209 },
-  { name: "The Mountain Eater", bpm: 127 },
-  { name: "Orthodox", bpm: 170 },
-  { name: "Parallel Retrogression", bpm: 175 },
-  { name: "Starduster", bpm: 220 },
-  { name: "SIGMA", bpm: 200 },
-  { name: "Electron", bpm: 134 },
-  { name: "WATER", bpm: 170 },
-  { name: "Miracle Forest", bpm: 192 },
-  { name: "MOBILYS", bpm: 144 },
-  { name: "Hardcore Kwaya", bpm: 200 },
-  { name: "Äventyr", bpm: 132 },
-  { name: "Träne", bpm: 135 },
-  { name: "雪降り、メリクリ", bpm: 180 },
-  { name: "Cervelle Connexion", bpm: 142 },
-  { name: "modulus", bpm: 158 },
-  { name: "Shadow", bpm: 172 },
-  { name: "Anomaly", bpm: 200 },
-  { name: "Destination", bpm: 200 },
-  { name: "Wavetapper", bpm: 224 },
-  { name: "Spasmodic(Haocore Mix)", bpm: 200 },
-  { name: "Eltaw", bpm: 193 },
-  { name: "大和撫子 -Wild Dances-", bpm: 158 },
-  { name: "Better Graphic Animation", bpm: 180 },
-  { name: "Initialize", bpm: 128 },
-  { name: "桜樹街道", bpm: 135 },
-  { name: "Get Ready!!", bpm: 142 },
-  { name: "volcanic", bpm: 191 },
-  { name: "XING", bpm: 177 },
-  { name: "Final Step!", bpm: 180 },
-  { name: "Cthugha", bpm: 213 },
-  { name: "Unorthodox Thoughts", bpm: 143 },
-  { name: "With You", bpm: 170 },
-  { name: "游园地", bpm: 128 },
-  { name: "Apocalyptic", bpm: 160 },
-  { name: "energy trixxx", bpm: 160 },
-  { name: "Clock Paradox", bpm: 140 },
-  { name: "Chronologika", bpm: 180 },
-  { name: "Nick of Time", bpm: 175 },
-  { name: "Chronomia", bpm: 227 },
-  { name: "Chronos Collapse - La Campanella", bpm: 240 },
-  { name: "Rrhar'il", bpm: 190 },
-  { name: "-Arkhei-", bpm: 224 },
-  { name: "Kerberos", bpm: 197 },
-  { name: "Time to Night Sky (feat. Lee Yu Jin)", bpm: 128 },
-  { name: "HAZARD", bpm: 128 },
-  { name: "Another Me (Kalpa)", bpm: 210 },
-  { name: "Don't Never Around", bpm: 175 },
-  { name: "RESSiSTANCE", bpm: 205 },
-  { name: "Concvssion", bpm: 190 },
-  { name: "ジングルベル(Jingle Bell)", bpm: 180 },
-  { name: "Another Round", bpm: 128 },
-  { name: "Dreamland", bpm: 120 },
-  { name: "996", bpm: 140 },
-  { name: "Future Mind", bpm: 180 },
-  { name: "Luminescent", bpm: 141 },
-  { name: "Demiurge", bpm: 111 },
-  { name: "FULi AUTO BUSTER", bpm: 145 },
-  { name: "Sigma (Haocore Mix) ~ 105秒の伝説 ~", bpm: 201 },
-  { name: "Sigma (Haocore Mix) ~ Regrets of the Yellow Tulip ~", bpm: 200 },
-  { name: "Demonkin", bpm: 192 },
-  { name: "Re_Nascence (Psystyle Ver.)", bpm: 150 },
-  { name: "Ark", bpm: 180 },
-  { name: "After Dawn", bpm: 220 },
-  { name: "INFiNiTE ENERZY -Overdoze-", bpm: 180 },
-  { name: "opia", bpm: 193 },
-  { name: "Protoflicker", bpm: 140 },
-  { name: "Horizon Blue", bpm: 200 },
-  { name: "You Are The Miserable", bpm: 163 },
-  { name: "Stasis", bpm: 180 },
-  { name: "いざ、参ります", bpm: 188 },
-  { name: "月下缭乱", bpm: 175 },
-  { name: "On And On!!", bpm: 170 },
-  { name: "心之所向", bpm: 180 },
-  { name: "inferior", bpm: 200 },
-  { name: "DataErr0r", bpm: 180 },
-  { name: "c.s.q.n.", bpm: 174 },
-  { name: "Brave Notes", bpm: 192 },
-  { name: "盏茗", bpm: 131 },
-  { name: "青芽", bpm: 216 },
-  { name: "Rainy Season", bpm: 188 },
-  { name: "Eternal Snow", bpm: 140 },
-  { name: "El Condor Pasa (Phigros Edit)", bpm: 150 },
-  { name: "Break Over", bpm: 185 },
-  { name: "Pont des souvenirs", bpm: 190 },
-  { name: "Believe Light (feat. 果丸哒呦)", bpm: 180 },
-  { name: "青丘", bpm: 180 },
-  { name: "瓷岁", bpm: 126 },
-  { name: "Feast远东之宴", bpm: 128 },
-  { name: "Upshift", bpm: 155 },
-  { name: "Poison AND÷OR Affection", bpm: 240 },
-  { name: "零號車輛", bpm: 240 },
-  { name: "今年も「雪降り、メリクリ」目指して頑張ります！！", bpm: 156 },
-  { name: "Crave Wave", bpm: 150 },
-  { name: "The Chariot ~REVIIVAL~", bpm: 190 },
-  { name: "Luminescence", bpm: 184 },
-  { name: "Retribution", bpm: 190 },
-  { name: "DESTRUCTION 3,2,1", bpm: 321 },
-  { name: "Bougainvillea", bpm: 120 },
-  { name: "Now Is The Time, Do It", bpm: 158 },
-  { name: "神話", bpm: 130 },
-  { name: "Trojan", bpm: 128 },
-  { name: "Temporal Shifting", bpm: 155 },
-  { name: "Ad astra per aspera", bpm: 197 },
-  { name: "A journey to the moonlight", bpm: 174 },
-  { name: "Rainy Heart", bpm: 140 },
-  { name: "Realms", bpm: 174 },
-  { name: "ぱぴぷぴぷぴぱ", bpm: 200 },
-  { name: "Triumph & Regret", bpm: 175 },
-  { name: "S.A.T.E.L.L.I.T.E.", bpm: 150 },
-  { name: "Dance with Silence", bpm: 256 },
-  { name: "Labyrinth in Kowloon: Walled World", bpm: 190 },
-  { name: "Compute It With Some Devilish Alcoholic Steampunk Engines", bpm: 165 },
-  { name: "+ERABY+E CONNEC+10N", bpm: 230 },
-  { name: "Diamond Eyes", bpm: 140 },
-  { name: "Bitterblossom", bpm: 180 },
-  { name: "Silence is Golden, Speech is Golden", bpm: 173 },
-  { name: "Fractured Angel", bpm: 301 },
-  { name: "Journey with You", bpm: 150 },
-  { name: "Secret Illumination", bpm: 160 },
-  { name: "Inverted World", bpm: 180 },
-  { name: "テリトリーバトル", bpm: 140 },
-  { name: "TECHNOPOLIS 2085", bpm: 134 },
-  { name: "bye", bpm: 160 },
-  { name: "聖夜讃歌", bpm: 175 },
-  { name: "ストレイソウル・アラウンド", bpm: 150 },
-  { name: "Manifold Hypothesis", bpm: 174 },
-  { name: "K. Moe (VIP)", bpm: 175 },
-  { name: "Crush BETA", bpm: 200 },
-  { name: "G.V.N. (Glitter, Vomitus and Neon)", bpm: 175 },
-  { name: "Khalid", bpm: 128 },
-  { name: "Quantum Hyperspace", bpm: 200 },
-  { name: "PANIC PARADISE", bpm: 172 },
-  { name: "Re:End of a Dream", bpm: 212 },
-  { name: "Broken Sky", bpm: 130 },
-  { name: "BRAIN HACKER", bpm: 158 },
-  { name: "Retribution ~ Cycle of Redemption ~", bpm: 225 },
-  { name: "Xenolith", bpm: 170 },
-  { name: "Artificial Existence", bpm: 191 },
-  { name: "Antithese", bpm: 172 },
-  { name: "PRAGMATISM -RESURRECTION-", bpm: 174 },
-  { name: "Shine After", bpm: 172 },
-  { name: "Bloom", bpm: 150 },
-  { name: "幽世桔梗", bpm: 182 },
-  { name: "千紫万紅", bpm: 203 },
-  { name: "明鏡烈火", bpm: 200 },
-  { name: "今天不是明天", bpm: 125 },
-  { name: "Cuvism³", bpm: 194 },
-  { name: "IL-Artifact", bpm: 184 },
-  { name: "A truth seeker -Communication with Utopia will be lost-", bpm: 206 },
-  { name: "Bounded Quietude", bpm: 280 },
-  { name: "君往何处 (Quo Vadis)", bpm: 160 },
-  { name: "暗夜苏醒 (REANIMATE)", bpm: 174 },
-  { name: "心の記憶", bpm: 150 },
-  { name: "Spotlight", bpm: 160 },
-  { name: "NightTheater", bpm: 151 },
-  { name: "Der Richter", bpm: 192 },
-  { name: "Grimheart", bpm: 170 },
-  { name: "月詠に鳴る", bpm: 180 }
-    // 可在此继续添加更多曲目
-  ];
-
-  function calculateBPM(interval) {
-    return Math.round(60000 / interval);
-  }
-
-  function displayBPM(bpm) {
-    document.getElementById("bpmDisplay").innerText = `BPM：${bpm}`;
-    if (lastBPM !== null) {
-      const delta = bpm - lastBPM;
-      document.getElementById("deltaDisplay").innerText =
-        (delta > 0 ? "+" : "") + delta + "ms（与上次差值）";
+    function handleTap(event) {
+      if (event.target !== document.getElementById('overlay')) return;
+      const now = Date.now();
+      timestamps.push(now);
+      if (timestamps.length > 6) timestamps.shift();
+      if (timestamps.length >= 2) {
+        const intervals = timestamps.slice(1).map((t, i) => t - timestamps[i]);
+        const avgInterval = intervals.reduce((a, b) => a + b, 0) / intervals.length;
+        const bpm = 60000 / avgInterval;
+        const diff = lastBPM ? Math.round((60000 / bpm - 60000 / lastBPM)) : '--';
+        lastBPM = bpm;
+        document.getElementById('bpmValue').textContent = `BPM：${bpm.toFixed(2)}`;
+        document.getElementById('bpmDiff').textContent = diff === '--' ? '--' : `${diff > 0 ? '+' : ''}${diff}ms`;
+      }
     }
-    lastBPM = bpm;
-  }
 
-  function findClosestTracks(bpm) {
-    return bpmList
-      .filter(track => Math.abs(track.bpm - bpm) <= 10)
-      .map(track => `${track.name} (${track.bpm})`);
-  }
+    document.addEventListener('keydown', handleTap);
+    document.addEventListener('touchstart', handleTap);
 
-  function showMatches(bpm) {
-    const matches = findClosestTracks(bpm);
-    const modal = document.getElementById("matchModal");
-    modal.innerHTML = `<h3>与以下曲目最匹配：</h3><ul>${
-      matches.length ? matches.map(m => `<li>${m}</li>`).join("") : "<li>无匹配</li>"
-    }</ul>`;
-    modal.style.display = "block";
-    setTimeout(() => { modal.style.display = "none"; }, 5000);
-  }
-
-  function saveBPM() {
-    const name = document.getElementById("bpmName").value || "未命名";
-    const bpmText = document.getElementById("bpmDisplay").innerText;
-    if (!bpmText.includes("BPM：")) return;
-    const bpm = parseInt(bpmText.replace("BPM：", ""));
-    bpmHistory.push({ name, bpm });
-    localStorage.setItem("bpmHistory", JSON.stringify(bpmHistory));
-    showMatches(bpm);
-  }
-
-  function showHistory() {
-    const stored = localStorage.getItem("bpmHistory");
-    if (!stored) {
-      alert("暂无历史记录");
-      return;
+    function saveBPM() {
+      if (!lastBPM) return alert("请先点击节奏检测 BPM");
+      const name = document.getElementById('bpmName').value.trim();
+      if (!name) return alert("请输入 BPM 名称");
+      const data = JSON.parse(localStorage.getItem('bpmHistory') || '[]');
+      const newEntry = { name, bpm: lastBPM.toFixed(2) };
+      data.push(newEntry);
+      localStorage.setItem('bpmHistory', JSON.stringify(data));
+      showRecommendations(lastBPM);
     }
-    const data = JSON.parse(stored);
-    alert("历史记录：\n" + data.map(d => `${d.name} - ${d.bpm} BPM`).join("\n"));
-  }
 
-  function handleClick() {
-    const now = Date.now();
-    if (startTime) {
-      const interval = now - startTime;
-      const bpm = calculateBPM(interval);
-      displayBPM(bpm);
-      startTime = null;
-    } else {
-      startTime = now;
-      document.getElementById("deltaDisplay").innerText = "";
+    function toggleHistory() {
+      const box = document.getElementById('history');
+      box.style.display = box.style.display === 'none' ? 'block' : 'none';
+      if (box.style.display === 'block') {
+        const data = JSON.parse(localStorage.getItem('bpmHistory') || '[]');
+        box.innerHTML = '<strong>历史记录：</strong><ul>' +
+          data.map(d => `<li><strong>${d.name}</strong> - ${d.bpm}</li>`).join('') + '</ul>';
+      }
     }
-  }
 
-  document.body.addEventListener("click", handleClick);
-  document.body.addEventListener("keydown", handleClick);
-</script>
-
+    function showRecommendations(currentBPM) {
+      const currentMs = 60000 / currentBPM;
+      const matches = songLibrary.filter(song => {
+        const songMs = 60000 / song.bpm;
+        return Math.abs(songMs - currentMs) <= 10;
+      });
+      if (matches.length === 0) return alert("已保存，但无匹配曲目");
+      const top10 = matches.slice(0, 10);
+      const message = "推荐匹配曲目：\n" + top10.map(s => `${s.name} (${s.bpm})`).join("\n");
+      alert(message);
+    }
+  </script>
 </body>
 </html>
